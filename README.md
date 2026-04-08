@@ -11,6 +11,9 @@ Uses cache and scrapes the astropix webpage to create api.
 1. Build the Docker image:
     ```bash
     docker build .
+    # (optional) to push to Docker Hub:
+    docker tag apod-stable <yourusername>/apod-stable:latest
+    docker push <yourusername>/apod-stable:latest
     ```
 2. Run the container:
     ```bash
