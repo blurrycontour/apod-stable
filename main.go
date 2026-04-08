@@ -11,8 +11,10 @@ import (
 )
 
 func main() {
-	apod.UserAgent = getEnv("USER_AGENT", apod.UserAgent)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
+	apod.UserAgent = getEnv("USER_AGENT", apod.UserAgent)
+	apod.PageURL = getEnv("APOD_URL", apod.PageURL)
 	listenAddr := getEnv("LISTEN_ADDR", ":8080")
 
 	mux := http.NewServeMux()

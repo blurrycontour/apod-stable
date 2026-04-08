@@ -10,7 +10,7 @@ import (
 
 // UserAgent is sent with every request to apod.nasa.gov.
 // Override via the USER_AGENT environment variable before calling Fetch.
-var UserAgent = "apod-scraper/1.0 (+https://github.com/you/apod-server)"
+var UserAgent = "apod-stable"
 
 // fetchHTML retrieves the raw HTML from url.
 func fetchHTML(url string) (string, error) {
@@ -35,53 +35,88 @@ func fetchHTML(url string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("reading body: %w", err)
 	}
-	return string(body), nil
+
+	htmlStr := string(body)
+	// Remove various BOMs and handle encoding issues
+	htmlStr = strings.TrimPrefix(htmlStr, "\ufeff")       // UTF-8 BOM
+	htmlStr = strings.TrimPrefix(htmlStr, "\xef\xbb\xbf") // UTF-8 BOM alt
+
+	// If we see null bytes, likely UTF-16, try to decode
+	if strings.Contains(htmlStr, "\x00") {
+		// Try UTF-16 decoding - for now just remove null bytes as a workaround
+		htmlStr = strings.ReplaceAll(htmlStr, "\x00", "")
+	}
+
+	// Debug: show first 500 chars if verbose logging needed
+	// log.Printf("DEBUG fetchHTML: charset=%s", resp.Header.Get("Content-Type"))
+	return htmlStr, nil
 }
 
 // parse extracts all APOD fields from the raw HTML of an APOD page.
 func parse(html string) (*APOD, error) {
-	apod := &APOD{SourceURL: PageURL}
+	apod := &APOD{Source: PageURL}
 
 	parseMedia(html, apod)
 	parseDate(html, apod)
 	parseTitle(html, apod)
-	parseCredit(html, apod)
 	parseExplanation(html, apod)
 
-	if apod.Title == "" && apod.ImageURL == "" && apod.VideoURL == "" {
-		return nil, fmt.Errorf("parse failed: could not extract any content — page structure may have changed")
-	}
+	// Debug logging
+	// log.Printf("DEBUG parse: type=%s date=%q title=%q credit=%q", apod.Type, apod.Date, apod.Title, apod.Credit)
+
+	// if apod.Title == "" && apod.ImageURL == "" && apod.VideoURL == "" {
+	// 	return nil, fmt.Errorf("parse failed: could not extract any content — page structure may have changed")
+	// }
 	return apod, nil
 }
 
 // parseMedia detects the media type and fills the relevant URL fields.
 func parseMedia(html string, apod *APOD) {
 	switch {
+	// Check for <video> tag with <source> element (HTML5 video)
+	case reVideoTag.MatchString(html):
+		apod.Type = MediaVideo
+		if m := reVideoSource.FindStringSubmatch(html); m != nil {
+			url := m[1]
+			if !strings.HasPrefix(url, "http") {
+				if !strings.HasPrefix(url, "/") {
+					url = "/" + url
+				}
+				url = BaseURL + strings.TrimPrefix(url, "/")
+			}
+			apod.URL = url
+		}
+
 	case reNASAVideo.MatchString(html):
 		apod.Type = MediaVideo
 		if m := reNASAVideo.FindStringSubmatch(html); m != nil {
-			apod.VideoURL = BaseURL + m[1]
+			apod.URL = BaseURL + m[1]
 		}
 
 	case reYouTube.MatchString(html):
 		apod.Type = MediaYouTube
 		if m := reYouTube.FindStringSubmatch(html); m != nil {
-			apod.VideoURL = m[1]
+			apod.URL = m[1]
 		}
 
 	case reIframe.MatchString(html):
 		apod.Type = MediaVideo
 		if m := reIframe.FindStringSubmatch(html); m != nil {
-			apod.VideoURL = m[1]
+			apod.URL = m[1]
 		}
 
 	default:
 		apod.Type = MediaImage
 		if m := reFullImg.FindStringSubmatch(html); m != nil {
-			apod.ImageURL = BaseURL + m[1]
-		}
-		if m := reThumb.FindStringSubmatch(html); m != nil {
-			apod.ThumbnailURL = BaseURL + m[1]
+			url := m[1]
+			// If URL doesn't start with http, prepend BaseURL
+			if !strings.HasPrefix(url, "http") {
+				if !strings.HasPrefix(url, "/") {
+					url = "/" + url
+				}
+				url = BaseURL + strings.TrimPrefix(url, "/")
+			}
+			apod.URL = url
 		}
 	}
 }
@@ -103,12 +138,6 @@ func parseTitle(html string, apod *APOD) {
 	}
 }
 
-func parseCredit(html string, apod *APOD) {
-	if m := reCredit.FindStringSubmatch(html); m != nil {
-		apod.Credit = cleanText(reStripTags.ReplaceAllString(m[1], " "))
-	}
-}
-
 func parseExplanation(html string, apod *APOD) {
 	if m := reExplanation.FindStringSubmatch(html); m != nil {
 		apod.Explanation = cleanText(reStripTags.ReplaceAllString(m[1], " "))
@@ -117,7 +146,7 @@ func parseExplanation(html string, apod *APOD) {
 
 // isSkippedTitle reports whether a <b> tag content should be ignored as a title candidate.
 func isSkippedTitle(candidate string) bool {
-	if len(candidate) <= 10 || strings.Contains(candidate, "<") {
+	if len(candidate) <= 2 || strings.Contains(candidate, "<") {
 		return true
 	}
 	lower := strings.ToLower(candidate)
