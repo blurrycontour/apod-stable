@@ -12,7 +12,7 @@ const (
 // APOD holds all scraped fields for a single day's entry.
 // Fields that don't apply to the media type are omitted from JSON output.
 type APOD struct {
-	Type        MediaType `json:"type"`
+	Type        MediaType `json:"media_type"`
 	Date        string    `json:"date"`
 	Title       string    `json:"title"`
 	URL         string    `json:"url"`
