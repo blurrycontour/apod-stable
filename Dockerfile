@@ -1,4 +1,4 @@
-# ── Build stage ──────────────────────────────────────────────────────────────
+# ── Build stage ──────────────────────────────────────
 FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
@@ -7,15 +7,17 @@ COPY main.go ./
 COPY apod/ ./apod/
 COPY server/ ./server/
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o apod-stable .
+# main application
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o apod-stable main.go
+# healthcheck application
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o healthcheck healthcheck/main.go
 
-# ── Final stage ───────────────────────────────────────────────────────────────
+# ── Final stage ──────────────────────────────────────
 FROM scratch
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /app/apod-stable /apod-stable
-
-ENV LISTEN_ADDR=:8080
+COPY --from=builder /app/healthcheck /healthcheck
 
 EXPOSE 8080
 
