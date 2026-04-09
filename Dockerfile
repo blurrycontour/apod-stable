@@ -2,10 +2,7 @@
 FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
-COPY go.mod ./
-COPY main.go ./
-COPY apod/ ./apod/
-COPY server/ ./server/
+COPY . .
 
 # main application
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o apod-stable main.go
