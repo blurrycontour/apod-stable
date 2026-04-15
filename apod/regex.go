@@ -12,12 +12,11 @@ const BaseURL = "https://apod.nasa.gov/apod/"
 // All regexes are compiled once at startup.
 var (
 	// Image: href="image/..." - just match the href, looks for any image tag nearby
-	reFullImg = regexp.MustCompile(`(?i)href="(image/[^"]+\.jpg)"`)
-	reThumb   = regexp.MustCompile(`(?i)src="(image/[^"]+\.jpg)"`)
+	reFullImg = regexp.MustCompile(`(?i)href="(image/[^"]+\.(jpg|jpeg|png))"`)
 
 	// Video detection: <video> tag or <source> tag with .mp4
 	reVideoTag    = regexp.MustCompile(`(?i)<video`)
-	reVideoSource = regexp.MustCompile(`(?i)<source\s+src="(image/[^"]+\.mp4)"`)
+	reVideoSource = regexp.MustCompile(`(?i)<source\s+src="(image/[^"]+\.(mp4|webm|mov))"`)
 
 	// NASA-hosted video: <a href="...mp4"><video ...>
 	reNASAVideo = regexp.MustCompile(`(?i)<a\s+href="([^"]+\.mp4)"\s*>\s*<video`)
@@ -33,11 +32,6 @@ var (
 
 	// Title: content in <b> tags (will filter with isSkippedTitle)
 	reTitle = regexp.MustCompile(`(?i)<b>\s*([^<]+?)\s*</b>`)
-
-	// Credit: matches "Image Credit:" or "Video Credit:" or "Music Credit:" followed by content
-	// Content may be plain text or wrapped in HTML tags (like <a> links)
-	// Stop at next <b> tag or closing <center>
-	reCredit = regexp.MustCompile(`(?is)(?:Image|Video|Music)\s+Credit\s*:\s*</b>(.+?)(?:<b>|</center>|$)`)
 
 	// Explanation: text after "Explanation:" label, more flexible with whitespace
 	reExplanation = regexp.MustCompile(`(?is)Explanation\s*:\s*</b>(.+?)(?:<p>|<hr|$)`)
